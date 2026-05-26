@@ -398,8 +398,9 @@ class GolfSessionControlCard extends HTMLElement {
         <div class="simactions">
           ${simButtons.map(([entities, label, icon]) => {
             const entity = Array.isArray(entities) ? this.firstEntity(entities) : entities;
-            const state = novaValue(this._hass, entity);
-            const disabled = !state || ['unknown', 'unavailable'].includes(String(state).toLowerCase());
+            const entityState = entity ? novaState(this._hass, entity) : null;
+            const entityMissing = !entity || !entityState || entityState.state === 'unavailable';
+            const disabled = entityMissing || !simOnline;
             return `<button class="action sim ${disabled ? 'disabled' : ''}" data-button="${novaEsc(entity)}" ${disabled ? 'disabled' : ''}><ha-icon icon="${novaEsc(icon)}"></ha-icon>${novaEsc(label)}</button>`;
           }).join('')}
         </div>
