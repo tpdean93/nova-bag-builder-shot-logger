@@ -337,11 +337,26 @@ def compute_advanced_metrics(
     if address_head and head_points:
         xs = [p[0] for p in head_points]
         ys = [p[1] for p in head_points]
-        pad = int(max(10, width * 0.015))
         max_dx = max(abs(p[0] - address_head[0]) for p in head_points)
         max_dy = max(abs(p[1] - address_head[1]) for p in head_points)
+        # Pose only gives us the nose, which drifts to the cheek as the head
+        # turns, so a nose-hugging box looks wrong. Size the box from shoulder
+        # width so it encloses the whole skull, and extend further above the
+        # nose (the crown) than below it (the chin).
+        ls = address.pixel_landmarks.get("left_shoulder") if _have(address, "left_shoulder") else None
+        rs = address.pixel_landmarks.get("right_shoulder") if _have(address, "right_shoulder") else None
+        if ls and rs:
+            shoulder_w = ((ls[0] - rs[0]) ** 2 + (ls[1] - rs[1]) ** 2) ** 0.5
+        else:
+            shoulder_w = width * 0.18
+        head_w = max(width * 0.05, shoulder_w * 0.62)
+        head_h = max(height * 0.06, shoulder_w * 0.92)
+        x1 = max(0, int(min(xs) - head_w * 0.5))
+        y1 = max(0, int(min(ys) - head_h * 0.62))
+        x2 = min(width, int(max(xs) + head_w * 0.5))
+        y2 = min(height, int(max(ys) + head_h * 0.38))
         head_box = {
-            "rect": [int(min(xs) - pad), int(min(ys) - pad), int(max(xs) + pad), int(max(ys) + pad)],
+            "rect": [x1, y1, x2, y2],
             "address_center": [int(address_head[0]), int(address_head[1])],
             "max_excursion_px": round(float((max_dx * max_dx + max_dy * max_dy) ** 0.5), 1),
             "max_horizontal_px": int(max_dx),

@@ -36,8 +36,7 @@
               "type": "custom:range-swing-coach-card",
               "title": "Local LLM Coaching",
               "grid_options": {
-                "columns": "full",
-                "rows": 10
+                "columns": "full"
               },
               "logo_url": "/local/ChatGPT%20Image%20May%2014%2C%202026%2C%2009_20_53%20PM.png"
             },
@@ -82,8 +81,7 @@
               "type": "custom:range-swing-coach-card",
               "title": "Local LLM Coaching",
               "grid_options": {
-                "columns": "full",
-                "rows": 7
+                "columns": "full"
               },
               "logo_url": "/local/ChatGPT%20Image%20May%2014%2C%202026%2C%2009_20_53%20PM.png"
             },
@@ -207,8 +205,7 @@
               "type": "custom:range-swing-coach-card",
               "title": "Local LLM Coaching",
               "grid_options": {
-                "columns": "full",
-                "rows": 7
+                "columns": "full"
               },
               "logo_url": "/local/ChatGPT%20Image%20May%2014%2C%202026%2C%2009_20_53%20PM.png"
             },

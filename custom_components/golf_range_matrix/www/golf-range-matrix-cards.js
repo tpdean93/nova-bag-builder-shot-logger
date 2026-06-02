@@ -29,9 +29,12 @@ const novaSortClubs = (clubs) => [...(clubs || [])].sort((a, b) => {
 /** True when the user is typing in an input inside this card (skip full re-render). */
 const novaIsEditing = (root) => {
   if (!root) return false;
-  if (root._editing) return true;
   const active = root.getRootNode()?.activeElement;
-  return !!(active && root.contains(active) && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA'));
+  const activeInside = !!(active && root.contains(active) && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA'));
+  // Clear a stale flag: if innerHTML was rebuilt while an input had focus the
+  // focusout never fired, which would otherwise wedge the card blank forever.
+  if (root._editing && !activeInside) root._editing = false;
+  return root._editing || activeInside;
 };
 /**
  * Track focus on a card host so we never re-render (and blow away an input)
@@ -1036,16 +1039,20 @@ class RangeSwingVideoCard extends HTMLElement {
     const meta = [club, when].filter(Boolean).join(' - ');
     if (this._tool === undefined) this._tool = 'box';
     if (this._color === undefined) this._color = '#ff4d6d';
+    if (this._thick === undefined) this._thick = 'm';
     if (!Array.isArray(this._shapes)) this._shapes = [];
     if (this._markupOn === undefined) this._markupOn = false;
     if (src !== this._markupSrc) { this._markupSrc = src; this._shapes = []; }
     const swatches = ['#ff4d6d', '#ffd23f', '#38f8ff', '#72ff7d', '#ffffff', '#000000'];
     const mtoolBtn = (tool, icon, label) => `<button class="mtool ${this._tool === tool ? 'sel' : ''}" data-tool="${tool}" title="${label}"><ha-icon icon="${icon}"></ha-icon></button>`;
+    const thicks = [['s', 3, 'Thin'], ['m', 5, 'Medium'], ['l', 8, 'Thick'], ['xl', 12, 'X-Thick']];
+    const thickBtn = ([t, px, label]) => `<button class="mtool mthick ${this._thick === t ? 'sel' : ''}" data-thick="${t}" title="${label} line"><span style="height:${px}px"></span></button>`;
     this.innerHTML = `<ha-card><div class="swing-card">
       <div class="top"><div><div class="kicker">Swing Analyzer</div><h2>${novaEsc(this.config.title)}</h2><div class="meta">${novaEsc(meta)}</div></div><button class="toggle ${on ? 'on' : ''}"><ha-icon icon="mdi:video-vintage"></ha-icon><span>${on ? 'On' : 'Off'}</span></button></div>
       ${src ? `
       <div class="markbar">
         <button class="mtool draw ${this._markupOn ? 'on' : ''}" data-mk="toggle"><ha-icon icon="mdi:draw"></ha-icon><span>${this._markupOn ? 'Drawing' : 'Draw'}</span></button>
+        <button class="mtool" data-mk="fullscreen" title="Fullscreen (keeps markup)"><ha-icon icon="mdi:fullscreen"></ha-icon></button>
         <div class="mtools" ${this._markupOn ? '' : 'hidden'}>
           ${mtoolBtn('pen', 'mdi:lead-pencil', 'Freehand')}
           ${mtoolBtn('line', 'mdi:vector-line', 'Line')}
@@ -1053,6 +1060,8 @@ class RangeSwingVideoCard extends HTMLElement {
           ${mtoolBtn('oval', 'mdi:vector-ellipse', 'Oval')}
           <span class="msep"></span>
           ${swatches.map(c => `<button class="mswatch ${this._color === c ? 'sel' : ''}" data-color="${c}" style="background:${c}"></button>`).join('')}
+          <span class="msep"></span>
+          ${thicks.map(thickBtn).join('')}
           <span class="msep"></span>
           <button class="mtool" data-mk="undo" title="Undo"><ha-icon icon="mdi:undo"></ha-icon></button>
           <button class="mtool" data-mk="clear" title="Clear all"><ha-icon icon="mdi:trash-can-outline"></ha-icon></button>
@@ -1066,7 +1075,7 @@ class RangeSwingVideoCard extends HTMLElement {
       ${this.config.show_coaching ? this.coaching() : ''}
     </div></ha-card><style>
       ha-card{border:0;border-radius:28px;background:linear-gradient(145deg,rgba(18,25,45,.94),rgba(8,12,24,.86));color:white;overflow:hidden;box-shadow:0 22px 60px rgba(0,0,0,.34)}
-      .swing-card{padding:18px;position:relative;isolation:isolate}.swing-card:before{content:'';position:absolute;inset:-35% auto auto 42%;width:360px;height:250px;border-radius:50%;background:radial-gradient(circle,rgba(56,248,255,.18),transparent 65%);z-index:-1}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.kicker{color:#8ffcff;font-size:10px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}h2{margin:2px 0 0;font-size:25px;font-weight:950;letter-spacing:-.04em}.meta{margin-top:4px;color:rgba(255,255,255,.58);font-size:12px;font-weight:800}.toggle{height:38px;min-width:82px;display:flex;align-items:center;justify-content:center;gap:7px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);color:rgba(255,255,255,.78);font-weight:950;cursor:pointer}.toggle ha-icon{--mdc-icon-size:19px;color:#8ffcff}.toggle.on{background:rgba(114,255,125,.14);border-color:rgba(114,255,125,.42);color:#d8ffdc}.toggle.on ha-icon{color:#72ff7d}.stage{position:relative;border-radius:20px;overflow:hidden;line-height:0}.video{width:100%;aspect-ratio:16/9;min-height:320px;background:#000;border-radius:20px;display:block;object-fit:contain}.markup{position:absolute;inset:0;width:100%;height:100%;touch-action:none}.markbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-bottom:10px}.markbar .mtools{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.markbar .mtools[hidden]{display:none}.mtool{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 10px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);color:rgba(255,255,255,.82);font-weight:850;cursor:pointer}.mtool ha-icon{--mdc-icon-size:18px;color:#8ffcff}.mtool.sel{background:rgba(56,248,255,.16);border-color:rgba(56,248,255,.5);color:#dffaff}.mtool.draw.on{background:rgba(255,77,109,.18);border-color:rgba(255,77,109,.5);color:#ffd2dc}.mtool.draw.on ha-icon{color:#ff4d6d}.mswatch{width:22px;height:22px;padding:0;border-radius:50%;border:2px solid rgba(255,255,255,.25);cursor:pointer}.mswatch.sel{border-color:#fff;box-shadow:0 0 0 2px rgba(56,248,255,.6)}.msep{width:1px;height:22px;background:rgba(255,255,255,.16);margin:0 2px}.empty{display:grid;place-items:center;min-height:280px;border-radius:20px;background:rgba(0,0,0,.28);color:rgba(255,255,255,.62);font-weight:800;text-align:center;padding:14px}.coach{margin-top:14px;border:1px solid rgba(56,248,255,.18);border-radius:22px;background:rgba(56,248,255,.07);padding:14px}.coachHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.coach h3{margin:2px 0 0;font-size:20px;line-height:1.1;letter-spacing:-.03em}.coachHead span{border:1px solid rgba(247,255,92,.28);border-radius:999px;padding:6px 9px;color:#f7ff8a;font-size:11px;font-weight:950;text-transform:uppercase}.coach p{margin:8px 0 0;color:rgba(255,255,255,.80);font-weight:760;line-height:1.42}.coachBlock{margin-top:12px}.coachBlock b{display:block;color:#8ffcff;text-transform:uppercase;letter-spacing:.12em;font-size:10px}.coachBlock ul{margin:8px 0 0;padding-left:19px;color:rgba(255,255,255,.80);font-weight:760;line-height:1.4}.errorText b{color:#ff9aad}.errorText p{color:#ffd2dc}@media(max-width:900px){.video{min-height:220px}.empty{min-height:220px}}
+      .swing-card{padding:18px;position:relative;isolation:isolate}.swing-card:before{content:'';position:absolute;inset:-35% auto auto 42%;width:360px;height:250px;border-radius:50%;background:radial-gradient(circle,rgba(56,248,255,.18),transparent 65%);z-index:-1}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.kicker{color:#8ffcff;font-size:10px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}h2{margin:2px 0 0;font-size:25px;font-weight:950;letter-spacing:-.04em}.meta{margin-top:4px;color:rgba(255,255,255,.58);font-size:12px;font-weight:800}.toggle{height:38px;min-width:82px;display:flex;align-items:center;justify-content:center;gap:7px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);color:rgba(255,255,255,.78);font-weight:950;cursor:pointer}.toggle ha-icon{--mdc-icon-size:19px;color:#8ffcff}.toggle.on{background:rgba(114,255,125,.14);border-color:rgba(114,255,125,.42);color:#d8ffdc}.toggle.on ha-icon{color:#72ff7d}.stage{position:relative;border-radius:20px;overflow:hidden;line-height:0}.video{width:100%;aspect-ratio:16/9;min-height:320px;background:#000;border-radius:20px;display:block;object-fit:contain}.markup{position:absolute;left:0;top:0;touch-action:none}.markbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-bottom:10px}.markbar .mtools{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.markbar .mtools[hidden]{display:none}.mtool{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 10px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);color:rgba(255,255,255,.82);font-weight:850;cursor:pointer}.mtool ha-icon{--mdc-icon-size:18px;color:#8ffcff}.mtool.sel{background:rgba(56,248,255,.16);border-color:rgba(56,248,255,.5);color:#dffaff}.mtool.draw.on{background:rgba(255,77,109,.18);border-color:rgba(255,77,109,.5);color:#ffd2dc}.mtool.draw.on ha-icon{color:#ff4d6d}.mswatch{width:22px;height:22px;padding:0;border-radius:50%;border:2px solid rgba(255,255,255,.25);cursor:pointer}.mswatch.sel{border-color:#fff;box-shadow:0 0 0 2px rgba(56,248,255,.6)}.mthick{padding:0 9px}.mthick span{display:block;width:20px;border-radius:999px;background:rgba(255,255,255,.78)}.mthick.sel span{background:#8ffcff}.msep{width:1px;height:22px;background:rgba(255,255,255,.16);margin:0 2px}.empty{display:grid;place-items:center;min-height:280px;border-radius:20px;background:rgba(0,0,0,.28);color:rgba(255,255,255,.62);font-weight:800;text-align:center;padding:14px}.stage:fullscreen{display:flex;align-items:center;justify-content:center;background:#000;border-radius:0}.stage:fullscreen .video{width:100%;height:100%;min-height:0;aspect-ratio:auto;object-fit:contain}.stage:fullscreen .markup{width:100%;height:100%}.coach{margin-top:14px;border:1px solid rgba(56,248,255,.18);border-radius:22px;background:rgba(56,248,255,.07);padding:14px}.coachHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.coach h3{margin:2px 0 0;font-size:20px;line-height:1.1;letter-spacing:-.03em}.coachHead span{border:1px solid rgba(247,255,92,.28);border-radius:999px;padding:6px 9px;color:#f7ff8a;font-size:11px;font-weight:950;text-transform:uppercase}.coach p{margin:8px 0 0;color:rgba(255,255,255,.80);font-weight:760;line-height:1.42}.coachBlock{margin-top:12px}.coachBlock b{display:block;color:#8ffcff;text-transform:uppercase;letter-spacing:.12em;font-size:10px}.coachBlock ul{margin:8px 0 0;padding-left:19px;color:rgba(255,255,255,.80);font-weight:760;line-height:1.4}.errorText b{color:#ff9aad}.errorText p{color:#ffd2dc}@media(max-width:900px){.video{min-height:220px}.empty{min-height:220px}}
       ${novaTvStyles}
     </style>`;
     this.querySelector('.toggle')?.addEventListener('click', () => this.toggle());
@@ -1084,15 +1093,21 @@ class RangeSwingVideoCard extends HTMLElement {
     if (!canvas || !video || !stage) return;
     const ctx = canvas.getContext('2d');
 
-    this.querySelectorAll('[data-mk], [data-tool], [data-color]').forEach((el) => {
+    this.querySelectorAll('[data-mk], [data-tool], [data-color], [data-thick]').forEach((el) => {
       el.addEventListener('click', () => {
         if (el.dataset.tool) { this._tool = el.dataset.tool; this.render(); return; }
         if (el.dataset.color) { this._color = el.dataset.color; this.render(); return; }
+        if (el.dataset.thick) { this._thick = el.dataset.thick; this.render(); return; }
         const action = el.dataset.mk;
         if (action === 'toggle') {
           this._markupOn = !this._markupOn;
           if (this._markupOn) { try { video.pause(); } catch (e) {} }
           this.render();
+        } else if (action === 'fullscreen') {
+          try {
+            if (document.fullscreenElement) document.exitFullscreen();
+            else (stage.requestFullscreen ? stage.requestFullscreen() : stage.webkitRequestFullscreen?.()).catch?.(() => {});
+          } catch (e) {}
         } else if (action === 'undo') {
           this._shapes.pop();
           this._redraw();
@@ -1106,18 +1121,31 @@ class RangeSwingVideoCard extends HTMLElement {
     });
 
     const sizeCanvas = () => {
-      const rect = video.getBoundingClientRect();
-      if (!rect.width || !rect.height) return;
+      const vrect = video.getBoundingClientRect();
+      const srect = stage.getBoundingClientRect();
+      if (!vrect.width || !vrect.height) return;
+      // Overlay the canvas exactly on the video element (not the whole stage)
+      // so the cursor maps 1:1 and the markup stays aligned in fullscreen,
+      // where the video no longer fills the stage.
+      canvas.style.left = `${vrect.left - srect.left}px`;
+      canvas.style.top = `${vrect.top - srect.top}px`;
+      canvas.style.width = `${vrect.width}px`;
+      canvas.style.height = `${vrect.height}px`;
       const dpr = window.devicePixelRatio || 1;
-      canvas.width = Math.round(rect.width * dpr);
-      canvas.height = Math.round(rect.height * dpr);
+      canvas.width = Math.round(vrect.width * dpr);
+      canvas.height = Math.round(vrect.height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       this._redraw();
     };
     if (this._ro) { try { this._ro.disconnect(); } catch (e) {} }
     this._ro = new ResizeObserver(sizeCanvas);
     this._ro.observe(stage);
+    this._ro.observe(video);
     video.addEventListener('loadedmetadata', sizeCanvas);
+    if (this._fsHandler) document.removeEventListener('fullscreenchange', this._fsHandler);
+    this._fsHandler = () => { requestAnimationFrame(sizeCanvas); requestAnimationFrame(() => requestAnimationFrame(sizeCanvas)); };
+    document.addEventListener('fullscreenchange', this._fsHandler);
+    sizeCanvas();
     requestAnimationFrame(sizeCanvas);
 
     if (!this._markupOn) return;
@@ -1131,7 +1159,7 @@ class RangeSwingVideoCard extends HTMLElement {
       drawing = true;
       canvas.setPointerCapture(ev.pointerId);
       const p = pt(ev);
-      this._current = { tool: this._tool, color: this._color, pts: [p, p] };
+      this._current = { tool: this._tool, color: this._color, thick: this._thick, pts: [p, p] };
       this._redraw();
     });
     canvas.addEventListener('pointermove', (ev) => {
@@ -1154,8 +1182,9 @@ class RangeSwingVideoCard extends HTMLElement {
   _drawShape(ctx, shape, w, h, scale = 1) {
     const pts = shape.pts || [];
     if (!pts.length) return;
+    const thickFactor = { s: 0.55, m: 1, l: 1.8, xl: 2.8 }[shape.thick || 'm'] || 1;
     ctx.strokeStyle = shape.color;
-    ctx.lineWidth = Math.max(2, 0.004 * Math.min(w, h)) * scale;
+    ctx.lineWidth = Math.max(1.5, 0.005 * Math.min(w, h)) * thickFactor * scale;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     const X = (n) => n * w;
