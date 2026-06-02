@@ -62,6 +62,11 @@ obs:
   port: 4455
   password: "CHANGE-ME"
   save_replay_on_shot: true
+  # Wait this long after the shot before flushing OBS's replay buffer so the
+  # saved clip includes the follow-through and finish instead of ending at
+  # impact. Set OBS "Settings > Output > Replay Buffer > Maximum Replay Time"
+  # to ~8-10s so the buffer still holds the address + backswing as well.
+  replay_delay_seconds: 1.8
 
 mqtt:
   enabled: true

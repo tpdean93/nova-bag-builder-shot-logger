@@ -70,6 +70,12 @@ DEFAULTS: Dict[str, Any] = {
         "port": 4455,
         "password": "",
         "save_replay_on_shot": True,
+        # Wait this many seconds after the shot before flushing OBS's replay
+        # buffer, so the saved clip includes the follow-through and finish
+        # instead of cutting off at impact. Make sure OBS's "Maximum Replay
+        # Time" is long enough to still hold the address + backswing too
+        # (~8-10s is a good value).
+        "replay_delay_seconds": 1.8,
     },
     "mqtt": {
         "enabled": True,

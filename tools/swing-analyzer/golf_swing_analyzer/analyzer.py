@@ -162,10 +162,23 @@ class Analyzer:
             return
 
         if self.obs and self.cfg.get("obs", {}).get("save_replay_on_shot", True):
-            ok = self.obs.save_replay()
-            log.info("OBS SaveReplayBuffer requested: ok=%s", ok)
+            # Delay the flush so the replay buffer captures the follow-through
+            # and finish, not just up to impact (the shot fires at impact).
+            delay = float(self.cfg.get("obs", {}).get("replay_delay_seconds", 1.8))
+            if delay > 0:
+                log.info("Scheduling OBS SaveReplayBuffer in %.1fs (follow-through)", delay)
+                threading.Timer(delay, self._save_replay_safe).start()
+            else:
+                self._save_replay_safe()
         else:
             log.info("OBS replay save skipped (disabled)")
+
+    def _save_replay_safe(self) -> None:
+        try:
+            ok = self.obs.save_replay()
+            log.info("OBS SaveReplayBuffer requested: ok=%s", ok)
+        except Exception as e:
+            log.warning("OBS save_replay error: %s", e)
 
     # ---------- Worker ----------
     def worker_loop(self) -> None:

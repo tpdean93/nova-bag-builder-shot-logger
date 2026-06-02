@@ -30,11 +30,31 @@ The recommended product path is now `Golf Range Matrix` as a Home Assistant cust
 
 The integration stores app data in `golf_range_matrix.sqlite3` under the Home Assistant config directory. Profiles, bags, club metadata, wedge matrices, shots, and summaries are no longer stored in mutable chunked `input_text` helpers.
 
+## Range Matrix Shot Lab Card
+
+`custom:range-shot-tracer-card` is the headline card. The live shot tracer renders the carry/total/offline of the last shot on a perspective driving range with mowing stripes, a horizon, scenery, and an animated ball flight.
+
+- **Wedge target trainer**: toggle a target green at a settable distance and landing radius (with quick preset buttons for 50/75/100/125/150/175 yd). The card draws the green and pin, shows a live **HIT / MISS** badge for the current shot, and keeps a running hits/attempts tally with a landing percentage. Settings and the score persist in the browser, and there's a Reset.
+- **Quick club select**: a compact strip of the clubs in the active bag (driven by `select.golf_range_matrix_range_matrix_active_club`). Tap a club to set which club the next logged shot used; the active club is highlighted and the last-shot time is shown.
+- **Responsive**: scales cleanly from an ultrawide monitor to a TV/kiosk.
+
 ## Local Swing Analyzer
 
 The optional local Swing Analyzer service lives in `tools/swing-analyzer/`. It subscribes to the same `golf/shot/raw` MQTT events as Range Matrix, saves OBS replay-buffer clips, runs MediaPipe pose analysis, serves annotated slow-motion MP4s, and publishes Home Assistant MQTT discovery for the `Golf Swing Analyzer` device.
 
 Range Matrix publishes retained selected-player/selected-club context to `golf/context/current`, so the analyzer labels swings with the dashboard-selected club instead of any stale club value coming from the OBS shot payload. The bundled card resource also includes `custom:range-swing-video-card`, a compact looping video card with an on/off control for the analyzer MQTT switch.
+
+The swing video card includes a **manual markup** toolset for drawing on the analyzed swing. Click **Draw** to enable it, then use:
+
+- **Line + angle** — draws a line and labels its tilt from vertical in degrees (spine angle, shaft lean, shoulder tilt).
+- **Plumb line** (full-height vertical) — head sway / hang-back reference.
+- **Level line** (full-width horizontal) — shoulder / hip level reference.
+- **Box** and **Oval** — head box or impact-zone callouts.
+- **Freehand** pen, plus color swatches, four line thicknesses, undo, clear, and save-to-PNG.
+
+Markup uses the **Fullscreen** button to expand the video (and toolbar) while keeping drawings aligned, and switching tools/colors no longer drops you out of fullscreen.
+
+**Clip length / follow-through:** the analyzer flushes the OBS replay buffer a short delay after the shot (`obs.replay_delay_seconds`, default 1.8s) so the saved clip includes the follow-through and finish rather than cutting off at impact. Set OBS *Maximum Replay Time* to ~8-10s so the buffer still holds the address and backswing.
 
 See `tools/swing-analyzer/README.md` for install steps, OBS replay-buffer setup, the `mqtt_swing` user, paho-mqtt installation into OBS, firewall notes for the analyzer HTTP server, LLM coaching options, and camera/FPS guidance. OBS Replay Buffer must be started in OBS before `SaveReplayBuffer` can produce source MP4s. Annotated videos default to 0.5x speed via `annotation.slow_motion_factor` in the analyzer config.
 

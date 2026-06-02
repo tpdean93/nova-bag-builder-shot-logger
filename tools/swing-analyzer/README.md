@@ -81,10 +81,12 @@ In OBS Studio:
 1. `Settings` > `Output` > switch `Output Mode` to `Advanced`.
 2. Find the `Replay Buffer` tab.
 3. Enable `Enable Replay Buffer`.
-4. Set `Maximum Replay Time` to `30s` (or whatever you want).
+4. Set `Maximum Replay Time` to `30s` (or whatever you want; `8-10s` is plenty and keeps clips snappy).
 5. Set the recording path to `C:\golf_swings\raw\`.
 6. `Settings` > `Hotkeys` > set a hotkey for `Save Replay` (so you can also save manually).
 7. Click the `Start Replay Buffer` button in the Controls dock.
+
+The shot fires at impact, so the analyzer waits `obs.replay_delay_seconds` (default `1.8`) after the shot before flushing the buffer. That delay is what captures the follow-through and finish in the saved clip — without it the clip ends at impact and looks like only a 1-2 second video. Increase it for a longer finish, but keep `Maximum Replay Time` comfortably larger than the delay plus your backswing.
 
 ### 3. OBS WebSocket
 
