@@ -335,29 +335,56 @@ def compute_advanced_metrics(
             head_points.append(frame.pixel_landmarks["nose"])
     head_box = None
     if address_head and head_points:
-        xs = [p[0] for p in head_points]
-        ys = [p[1] for p in head_points]
         max_dx = max(abs(p[0] - address_head[0]) for p in head_points)
         max_dy = max(abs(p[1] - address_head[1]) for p in head_points)
-        # Pose only gives us the nose, which drifts to the cheek as the head
-        # turns, so a nose-hugging box looks wrong. Size the box from shoulder
-        # width so it encloses the whole skull, and extend further above the
-        # nose (the crown) than below it (the chin).
-        ls = address.pixel_landmarks.get("left_shoulder") if _have(address, "left_shoulder") else None
-        rs = address.pixel_landmarks.get("right_shoulder") if _have(address, "right_shoulder") else None
-        if ls and rs:
-            shoulder_w = ((ls[0] - rs[0]) ** 2 + (ls[1] - rs[1]) ** 2) ** 0.5
+
+        # Build a box that actually wraps the whole skull at address. The nose
+        # alone sits low/front on the face, so we use the eyes and ears to find
+        # the true head width and a vertical anchor near the middle of the head,
+        # then extend well above (the crown) and below (the chin).
+        def _addr(name: str):
+            return address.pixel_landmarks.get(name) if _have(address, name) else None
+
+        l_ear, r_ear = _addr("left_ear"), _addr("right_ear")
+        l_eye, r_eye = _addr("left_eye"), _addr("right_eye")
+        nose = _addr("nose") or address_head
+
+        face_pts = [p for p in (nose, l_eye, r_eye, l_ear, r_ear) if p]
+
+        # Head width: ear span is the most reliable; fall back to eye span, then
+        # shoulders. The multipliers pad out to the outside of the skull/hair.
+        if l_ear and r_ear:
+            head_w = ((l_ear[0] - r_ear[0]) ** 2 + (l_ear[1] - r_ear[1]) ** 2) ** 0.5 * 1.6
+        elif l_eye and r_eye:
+            head_w = ((l_eye[0] - r_eye[0]) ** 2 + (l_eye[1] - r_eye[1]) ** 2) ** 0.5 * 2.8
         else:
-            shoulder_w = width * 0.18
-        head_w = max(width * 0.05, shoulder_w * 0.62)
-        head_h = max(height * 0.06, shoulder_w * 0.92)
-        x1 = max(0, int(min(xs) - head_w * 0.5))
-        y1 = max(0, int(min(ys) - head_h * 0.62))
-        x2 = min(width, int(max(xs) + head_w * 0.5))
-        y2 = min(height, int(max(ys) + head_h * 0.38))
+            ls = _addr("left_shoulder")
+            rs = _addr("right_shoulder")
+            if ls and rs:
+                shoulder_w = ((ls[0] - rs[0]) ** 2 + (ls[1] - rs[1]) ** 2) ** 0.5
+            else:
+                shoulder_w = width * 0.18
+            head_w = shoulder_w * 0.62
+        head_w = max(width * 0.07, head_w)
+        head_h = head_w * 1.45  # skulls are taller than they are wide head-on
+
+        cx = sum(p[0] for p in face_pts) / len(face_pts)
+        # Anchor vertically on the ear/eye line (roughly the head's middle) so we
+        # can push up to the crown; fall back to the nose when ears are hidden.
+        if l_ear and r_ear:
+            anchor_y = (l_ear[1] + r_ear[1]) / 2.0
+        elif l_eye and r_eye:
+            anchor_y = (l_eye[1] + r_eye[1]) / 2.0
+        else:
+            anchor_y = float(nose[1])
+
+        x1 = max(0, int(cx - head_w * 0.55))
+        x2 = min(width, int(cx + head_w * 0.55))
+        y1 = max(0, int(anchor_y - head_h * 0.68))
+        y2 = min(height, int(anchor_y + head_h * 0.62))
         head_box = {
             "rect": [x1, y1, x2, y2],
-            "address_center": [int(address_head[0]), int(address_head[1])],
+            "address_center": [int(cx), int(anchor_y)],
             "max_excursion_px": round(float((max_dx * max_dx + max_dy * max_dy) ** 0.5), 1),
             "max_horizontal_px": int(max_dx),
             "max_vertical_px": int(max_dy),

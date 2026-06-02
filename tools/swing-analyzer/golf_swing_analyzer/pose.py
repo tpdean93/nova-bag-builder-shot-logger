@@ -14,8 +14,12 @@ log = logging.getLogger(__name__)
 
 
 # 33 BlazePose landmarks; we only care about the body ones below.
+# Eyes (2,5) and ears (7,8) let us size/position the head box around the whole
+# skull instead of just hugging the nose, which drifts to the cheek mid-swing.
 LANDMARK_NAMES = {
     0: "nose",
+    2: "left_eye", 5: "right_eye",
+    7: "left_ear", 8: "right_ear",
     11: "left_shoulder", 12: "right_shoulder",
     13: "left_elbow", 14: "right_elbow",
     15: "left_wrist", 16: "right_wrist",
