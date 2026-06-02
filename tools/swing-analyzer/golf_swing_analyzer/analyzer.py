@@ -38,6 +38,7 @@ from watchdog.observers import Observer
 
 from .annotate import annotate_video
 from .config import load_config
+from .impact import analyze_top_down
 from .llm import generate_summary
 from .metrics import compute_advanced_metrics, compute_body_metrics, derive_faults, detect_phases
 from .mqtt_bridge import MQTTBridge
@@ -114,6 +115,11 @@ class Analyzer:
             on_context=self._on_mqtt_context,
             on_enable=self._on_mqtt_enable,
         )
+        td_cfg = cfg.get("top_down", {}) or {}
+        self.top_down_dir: Optional[Path] = None
+        if td_cfg.get("enabled") and td_cfg.get("raw_video_dir"):
+            self.top_down_dir = Path(td_cfg["raw_video_dir"])
+            self.top_down_dir.mkdir(parents=True, exist_ok=True)
         self.context: Dict[str, Any] = {}
         # Default to off so a fresh install does not chew through CPU/disk
         # until the user clicks Swing Analyzer in HA.
@@ -236,7 +242,133 @@ class Analyzer:
         _, path, data = candidates[0]
         return path, data
 
+    def _is_top_down_path(self, path: Path) -> bool:
+        if not self.top_down_dir:
+            return False
+        try:
+            path.resolve().relative_to(self.top_down_dir.resolve())
+            return True
+        except ValueError:
+            return False
+
+    def _find_top_down_video(self, reference: Path) -> Optional[Path]:
+        if not self.top_down_dir or not self.top_down_dir.exists():
+            return None
+        try:
+            ref_mtime = datetime.fromtimestamp(reference.stat().st_mtime)
+        except Exception:
+            ref_mtime = datetime.now()
+        max_diff = float(self.cfg["matching"]["max_time_difference_seconds"])
+        candidates: List[Tuple[float, Path]] = []
+        for clip in self.top_down_dir.iterdir():
+            if not clip.is_file() or clip.suffix.lower() not in VIDEO_EXTS:
+                continue
+            try:
+                diff = abs(
+                    (datetime.fromtimestamp(clip.stat().st_mtime) - ref_mtime).total_seconds()
+                )
+            except Exception:
+                continue
+            if diff <= max_diff:
+                candidates.append((diff, clip))
+        if not candidates:
+            return None
+        candidates.sort(key=lambda x: x[0])
+        return candidates[0][1]
+
+    def _find_analysis_near_video(
+        self, video_path: Path
+    ) -> Optional[Tuple[Path, Dict[str, Any]]]:
+        max_diff = float(self.cfg["matching"]["max_time_difference_seconds"])
+        try:
+            vm = datetime.fromtimestamp(video_path.stat().st_mtime)
+        except Exception:
+            vm = datetime.now()
+        best: Optional[Tuple[float, Path, Dict[str, Any]]] = None
+        for analysis_file in self.analysis_dir.glob("*_analysis.json"):
+            try:
+                data = json.loads(analysis_file.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            ts_raw = data.get("timestamp")
+            try:
+                ts = datetime.fromisoformat(str(ts_raw).replace("Z", ""))
+            except Exception:
+                ts = datetime.fromtimestamp(analysis_file.stat().st_mtime)
+            diff = abs((ts - vm).total_seconds())
+            if diff <= max_diff and (best is None or diff < best[0]):
+                best = (diff, analysis_file, data)
+        if best is None:
+            return None
+        return best[1], best[2]
+
+    def _run_top_down_analysis(
+        self,
+        td_video: Path,
+        impact_time_s: Optional[float],
+        stamp: str,
+    ) -> Dict[str, Any]:
+        td_cfg = self.cfg.get("top_down", {}) or {}
+        overlay_path = self.annotated_dir / f"{stamp}_topdown_impact.jpg"
+        public = (
+            td_cfg.get("public_base_url")
+            or self.cfg.get("server", {}).get("public_base_url")
+            or ""
+        ).rstrip("/")
+        result = analyze_top_down(
+            str(td_video),
+            td_cfg,
+            impact_time_s=impact_time_s,
+            out_image_path=str(overlay_path),
+        )
+        if public and result.get("overlay_image"):
+            result["overlay_url"] = f"{public}/videos/annotated/{overlay_path.name}"
+        return result
+
+    def process_top_down(self, video_path: Path) -> None:
+        """Process a top-down replay clip and merge into the nearest analysis."""
+        log.info("Processing top-down clip %s", video_path)
+        if not self._wait_for_stable_file(video_path, timeout=float(
+            self.cfg["matching"].get("wait_for_video_seconds", 20)
+        )):
+            log.warning("Top-down file never stabilized: %s", video_path)
+            return
+
+        impact_time: Optional[float] = None
+        match = self._find_analysis_near_video(video_path)
+        if match is not None:
+            _, data = match
+            raw_ts = data.get("impact_timestamp_s")
+            if isinstance(raw_ts, (int, float)):
+                impact_time = float(raw_ts)
+
+        stamp = video_path.stem
+        td_result = self._run_top_down_analysis(video_path, impact_time, stamp)
+
+        if match is not None:
+            analysis_path, data = match
+            data["top_down"] = td_result
+            data["top_down_summary"] = td_result.get("summary", "")
+            try:
+                with analysis_path.open("w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2)
+            except Exception as e:
+                log.warning("Could not update analysis with top-down: %s", e)
+            recent = self._enforce_retention()
+            data["recent"] = recent
+            self.mqtt.publish_result(data)
+            log.info("Merged top-down into %s", analysis_path.name)
+        else:
+            log.info(
+                "Top-down analyzed (%s) but no matching DTL analysis yet",
+                td_result.get("status"),
+            )
+
     def process_video(self, video_path: Path) -> None:
+        if self._is_top_down_path(video_path):
+            self.process_top_down(video_path)
+            return
+
         log.info("Processing %s", video_path)
         if not self._wait_for_stable_file(video_path, timeout=float(
             self.cfg["matching"].get("wait_for_video_seconds", 20)
@@ -252,10 +384,19 @@ class Analyzer:
             shot_file, shot = shot_match
             log.info("Matched shot file: %s", shot_file.name)
 
+        tracking = self.cfg.get("tracking", {}) or {}
         try:
             frames, width, height, fps, total = detect_video_pose(
                 str(video_path),
                 sample_rate=int(self.cfg["camera"]["fps_sample_rate"]),
+                model=str(tracking.get("pose_model", "heavy")),
+                smoothing=str(tracking.get("smoothing", "one_euro")),
+                one_euro=tracking.get("one_euro") or {},
+                smoothing_alpha=float(tracking.get("smoothing_alpha", 0.35)),
+                min_torso_visibility=float(tracking.get("min_torso_visibility", 0.6)),
+                detection_confidence=float(tracking.get("detection_confidence", 0.6)),
+                presence_confidence=float(tracking.get("presence_confidence", 0.6)),
+                tracking_confidence=float(tracking.get("tracking_confidence", 0.6)),
             )
         except Exception as e:
             log.exception("Pose detection failed: %s", e)
@@ -343,9 +484,28 @@ class Analyzer:
                 "impact_idx": phases.impact_idx,
                 "finish_idx": phases.finish_idx,
             },
+            "impact_timestamp_s": (
+                frames[phases.impact_idx].timestamp_s
+                if phases.impact_idx is not None
+                and 0 <= phases.impact_idx < len(frames)
+                else None
+            ),
         }
         analysis["body_summary"] = _summarize_body(body)
         analysis["faults_text"] = ", ".join(faults) if faults else "none"
+
+        td_cfg = self.cfg.get("top_down", {}) or {}
+        if td_cfg.get("enabled"):
+            td_video = self._find_top_down_video(video_path)
+            if td_video:
+                impact_time = analysis.get("impact_timestamp_s")
+                td_result = self._run_top_down_analysis(
+                    td_video,
+                    float(impact_time) if impact_time is not None else None,
+                    stamp,
+                )
+                analysis["top_down"] = td_result
+                analysis["top_down_summary"] = td_result.get("summary", "")
 
         llm_result = generate_summary(self.cfg.get("llm", {}), analysis)
         if llm_result:
@@ -636,8 +796,11 @@ class Analyzer:
 
         observer = Observer()
         observer.schedule(Handler(), str(self.raw_dir), recursive=False)
-        observer.start()
         log.info("Watching: %s", self.raw_dir)
+        if self.top_down_dir:
+            observer.schedule(Handler(), str(self.top_down_dir), recursive=False)
+            log.info("Watching top-down: %s", self.top_down_dir)
+        observer.start()
         return observer
 
 

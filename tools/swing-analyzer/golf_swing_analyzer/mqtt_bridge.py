@@ -249,7 +249,25 @@ class MQTTBridge:
              "{{ value_json.scores.transition_steepness_score.score | default('', true) }}"),
             ("balance_score", "Last Swing Balance Score", None,
              "{{ value_json.scores.balance_score.score | default('', true) }}"),
+            ("top_down_summary", "Last Swing Top-Down Summary", None,
+             "{{ value_json.top_down_summary | default('', true) }}"),
+            ("impact_approach_angle", "Last Swing Impact Approach", "deg",
+             "{{ value_json.top_down.approach_angle_deg | default('', true) }}"),
         ]
+        # Home Assistant caps a sensor STATE at 255 characters, which is what
+        # was clipping the coach text with "...". For the long coaching fields
+        # we also publish the untruncated value as a "full_text" attribute
+        # (attributes allow ~16 KB), and the dashboard cards prefer it.
+        full_text_sources = {
+            "summary": "value_json.summary",
+            "priority_fault": "value_json.llm_priority_fault",
+            "why_it_matters": "value_json.llm_why_it_matters",
+            "evidence": "value_json.llm_evidence",
+            "drill": "value_json.llm_drill",
+            "confidence": "value_json.llm_confidence",
+            "top_down_summary": "value_json.top_down_summary",
+        }
+
         for object_id, friendly, unit, tpl in sensors:
             payload_cfg: Dict[str, Any] = {
                 "name": friendly,
@@ -261,6 +279,12 @@ class MQTTBridge:
             }
             if unit:
                 payload_cfg["unit_of_measurement"] = unit
+            full_src = full_text_sources.get(object_id)
+            if full_src:
+                payload_cfg["json_attributes_topic"] = f"{prefix}/latest"
+                payload_cfg["json_attributes_template"] = (
+                    "{{ {'full_text': (" + full_src + " | default('', true))} | tojson }}"
+                )
             client.publish(
                 f"{disc}/sensor/{device_id}/{object_id}/config",
                 json.dumps(payload_cfg),

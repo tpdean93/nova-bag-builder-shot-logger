@@ -8,6 +8,60 @@
   ],
   "views": [
     {
+      "title": "Launch Monitor (TV)",
+      "path": "launch-monitor-tv",
+      "icon": "mdi:television",
+      "type": "sections",
+      "max_columns": 1,
+      "sections": [
+        {
+          "type": "grid",
+          "cards": [
+            {
+              "type": "custom:range-shot-tracer-card",
+              "grid_options": {
+                "columns": "full",
+                "rows": 20
+              }
+            },
+            {
+              "type": "custom:range-metric-panel-card",
+              "title": "Live Numbers",
+              "grid_options": {
+                "columns": "full",
+                "rows": 6
+              }
+            },
+            {
+              "type": "custom:range-swing-coach-card",
+              "title": "Local LLM Coaching",
+              "grid_options": {
+                "columns": "full",
+                "rows": 10
+              },
+              "logo_url": "/local/ChatGPT%20Image%20May%2014%2C%202026%2C%2009_20_53%20PM.png"
+            },
+            {
+              "type": "custom:range-swing-video-card",
+              "title": "Last Swing",
+              "grid_options": {
+                "columns": "full",
+                "rows": 16
+              }
+            },
+            {
+              "type": "custom:range-shot-history-card",
+              "grid_options": {
+                "columns": "full",
+                "rows": 10
+              }
+            }
+          ]
+        }
+      ],
+      "cards": []
+    },
+    {
       "title": "Launch Monitor",
       "path": "launch-monitor",
       "icon": "mdi:golf",
@@ -25,16 +79,13 @@
               }
             },
             {
-              "type": "markdown",
+              "type": "custom:range-swing-coach-card",
               "title": "Local LLM Coaching",
-              "content": "<div class=\"coach-title\"><img src=\"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABIMDRANCxIQDhAUExIVGywdGxgYGzYnKSAsQDlEQz85Pj1HUGZXR0thTT0+WXlaYWltcnNyRVV9hnxvhWZwcm7/2wBDARMUFBsXGzQdHTRuST5Jbm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm7/wAARCAA4ADgDASIAAhEBAxEB/8QAGgABAAMBAQEAAAAAAAAAAAAAAAQFBgMBAv/EACsQAAIBAwMDAQgDAAAAAAAAAAECAwAEEQUSITFBURMGFSIyYXGBoRRS0f/EABYBAQEBAAAAAAAAAAAAAAAAAAABAv/EABkRAQEBAQEBAAAAAAAAAAAAAAABETECIf/aAAwDAQACEQMRAD8A3FKUoFKgM8l9O8ccjRW0bbWZDhpG7gHsB5qu1zOlLbmySNQ7EylwWJwOO+fNE1oKVSaNry3wCyKI343LnOM9CPof1V3Ul1SlKVQpSlBSafdiCC2R+A8eST/bcd37qP7WSboLXZnJLdPsKk6hYtEZCsTyW7sZB6fzwuepA7qe4rNX80t7cRWrM/wZbOzIK+fPbxmjF5j3RATqoC527H3cDx/u2t9Wd0DRf47CVg23j4nXDPjoMdgOvPJNaKpJjXnhSlKquc80dtA80zBY0GWJ7Cq+w1drhpEuIDBJs9WJWPzp5+9Tby0hvYhHOpdAwbbnAJHnzUIaHarcLP6czSKThmnY4z170S7vx4dYk932U0duJJrwhVTftAOCev4qvGqo1694YI2vEC26RxzEg7m75UY5781ZS6dE9iLU2x9O3I9HEhBH1BBz0rmui22GR7V2EqAu7zFmDDkAEnIx5FB8XOuXFk7R3lkqSbA6bJtwI3BT2461M1jUvddqk2wOXkEY3NtAz3JwfFRV0W3MeHtXkMy7JDJOzFFyDwSfzx4rvHpFvGVJSV9rrIvqTs2COnU/WivvSdQfUInkZIlVTtBjkL5/QpU4dOmKUClKUClKUClKUClKUH//2Q==\" alt=\"AI Golf Coach logo\"><div><span>AI Golf Coach</span><b>Trinity Swing Coach</b></div></div>\n\n**Grade / Focus:** {{ states('sensor.golf_swing_analyzer_last_swing_priority_fault') or 'Waiting for Trinity analysis' }}\n\n**Quick Summary:** {{ states('sensor.golf_swing_analyzer_last_swing_why_it_matters') }}\n\n**Observations:** {{ states('sensor.golf_swing_analyzer_last_swing_evidence') }}\n\n**Recommended Drills:** {{ states('sensor.golf_swing_analyzer_last_swing_drill') }}\n\n**Confidence / Next Swing:** {{ states('sensor.golf_swing_analyzer_last_swing_confidence') }}\n\n**Fallback metrics:** {{ states('sensor.golf_swing_analyzer_last_swing_summary') }}\n\n**LLM status:** {{ states('sensor.golf_swing_analyzer_last_swing_llm_status') }}\n\n{{ states('sensor.golf_swing_analyzer_last_swing_llm_error') }}",
               "grid_options": {
                 "columns": "full",
                 "rows": 7
               },
-              "card_mod": {
-                "style": "ha-card { border: 1px solid rgba(56,248,255,.22); border-radius: 24px; color: #eef8ff; background: radial-gradient(circle at 85% 10%, rgba(56,248,255,.18), transparent 28%), radial-gradient(circle at 15% 90%, rgba(168,85,247,.22), transparent 34%), linear-gradient(145deg, rgba(18,25,45,.94), rgba(8,12,24,.86)); box-shadow: 0 22px 60px rgba(0,0,0,.34); overflow: hidden; } ha-card .card-header { color: #8ffcff; font-size: 13px; font-weight: 950; letter-spacing: .14em; text-transform: uppercase; } ha-markdown { color: #eef8ff; } .coach-title { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; } .coach-title img { width: 42px; height: 42px; border-radius: 999px; object-fit: cover; box-shadow: 0 0 18px rgba(247,255,92,.20); background: rgba(255,255,255,.9); } .coach-title span { display: block; color: #8ffcff; font-size: 10px; font-weight: 950; letter-spacing: .16em; text-transform: uppercase; } .coach-title b { display: block; color: #f7ff8a; font-size: 18px; line-height: 1.1; } ha-markdown strong { color: #8ffcff; } :host { margin-top: 4px; display: block; }"
-              }
+              "logo_url": "/local/ChatGPT%20Image%20May%2014%2C%202026%2C%2009_20_53%20PM.png"
             },
             {
               "type": "custom:range-metric-panel-card",
@@ -153,16 +204,13 @@
               }
             },
             {
-              "type": "markdown",
+              "type": "custom:range-swing-coach-card",
               "title": "Local LLM Coaching",
-              "content": "<div class=\"coach-title\"><img src=\"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABIMDRANCxIQDhAUExIVGywdGxgYGzYnKSAsQDlEQz85Pj1HUGZXR0thTT0+WXlaYWltcnNyRVV9hnxvhWZwcm7/2wBDARMUFBsXGzQdHTRuST5Jbm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm7/wAARCAA4ADgDASIAAhEBAxEB/8QAGgABAAMBAQEAAAAAAAAAAAAAAAQFBgMBAv/EACsQAAIBAwMDAQgDAAAAAAAAAAECAwAEEQUSITFBURMGFSIyYXGBoRRS0f/EABYBAQEBAAAAAAAAAAAAAAAAAAABAv/EABkRAQEBAQEBAAAAAAAAAAAAAAABETECIf/aAAwDAQACEQMRAD8A3FKUoFKgM8l9O8ccjRW0bbWZDhpG7gHsB5qu1zOlLbmySNQ7EylwWJwOO+fNE1oKVSaNry3wCyKI343LnOM9CPof1V3Ul1SlKVQpSlBSafdiCC2R+A8eST/bcd37qP7WSboLXZnJLdPsKk6hYtEZCsTyW7sZB6fzwuepA7qe4rNX80t7cRWrM/wZbOzIK+fPbxmjF5j3RATqoC527H3cDx/u2t9Wd0DRf47CVg23j4nXDPjoMdgOvPJNaKpJjXnhSlKquc80dtA80zBY0GWJ7Cq+w1drhpEuIDBJs9WJWPzp5+9Tby0hvYhHOpdAwbbnAJHnzUIaHarcLP6czSKThmnY4z170S7vx4dYk932U0duJJrwhVTftAOCev4qvGqo1694YI2vEC26RxzEg7m75UY5781ZS6dE9iLU2x9O3I9HEhBH1BBz0rmui22GR7V2EqAu7zFmDDkAEnIx5FB8XOuXFk7R3lkqSbA6bJtwI3BT2461M1jUvddqk2wOXkEY3NtAz3JwfFRV0W3MeHtXkMy7JDJOzFFyDwSfzx4rvHpFvGVJSV9rrIvqTs2COnU/WivvSdQfUInkZIlVTtBjkL5/QpU4dOmKUClKUClKUClKUClKUH//2Q==\" alt=\"AI Golf Coach logo\"><div><span>AI Golf Coach</span><b>Trinity Swing Coach</b></div></div>\n\n**Grade / Focus:** {{ states('sensor.golf_swing_analyzer_last_swing_priority_fault') or 'Waiting for Trinity analysis' }}\n\n**Quick Summary:** {{ states('sensor.golf_swing_analyzer_last_swing_why_it_matters') }}\n\n**Observations:** {{ states('sensor.golf_swing_analyzer_last_swing_evidence') }}\n\n**Recommended Drills:** {{ states('sensor.golf_swing_analyzer_last_swing_drill') }}\n\n**Confidence / Next Swing:** {{ states('sensor.golf_swing_analyzer_last_swing_confidence') }}\n\n**Fallback metrics:** {{ states('sensor.golf_swing_analyzer_last_swing_summary') }}\n\n**LLM status:** {{ states('sensor.golf_swing_analyzer_last_swing_llm_status') }}\n\n{{ states('sensor.golf_swing_analyzer_last_swing_llm_error') }}",
               "grid_options": {
                 "columns": "full",
                 "rows": 7
               },
-              "card_mod": {
-                "style": "ha-card { border: 1px solid rgba(56,248,255,.22); border-radius: 24px; color: #eef8ff; background: radial-gradient(circle at 85% 10%, rgba(56,248,255,.18), transparent 28%), radial-gradient(circle at 15% 90%, rgba(168,85,247,.22), transparent 34%), linear-gradient(145deg, rgba(18,25,45,.94), rgba(8,12,24,.86)); box-shadow: 0 22px 60px rgba(0,0,0,.34); overflow: hidden; } ha-card .card-header { color: #8ffcff; font-size: 13px; font-weight: 950; letter-spacing: .14em; text-transform: uppercase; } ha-markdown { color: #eef8ff; } .coach-title { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; } .coach-title img { width: 42px; height: 42px; border-radius: 999px; object-fit: cover; box-shadow: 0 0 18px rgba(247,255,92,.20); background: rgba(255,255,255,.9); } .coach-title span { display: block; color: #8ffcff; font-size: 10px; font-weight: 950; letter-spacing: .16em; text-transform: uppercase; } .coach-title b { display: block; color: #f7ff8a; font-size: 18px; line-height: 1.1; } ha-markdown strong { color: #8ffcff; } :host { margin-top: 4px; display: block; }"
-              }
+              "logo_url": "/local/ChatGPT%20Image%20May%2014%2C%202026%2C%2009_20_53%20PM.png"
             },
             {
               "type": "entities",

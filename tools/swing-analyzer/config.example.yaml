@@ -16,7 +16,25 @@ retention:
 
 camera:
   angle: "down_the_line"
-  fps_sample_rate: 2
+  # 1 = analyze every frame (smoothest body tracking, a bit slower).
+  # 2 = every other frame (faster, slightly choppier).
+  fps_sample_rate: 1
+
+# Body tracking quality. If the skeleton stutters, prefer the "heavy" model
+# and the One-Euro filter below. Heavy is slower per clip but far steadier,
+# which matters now that the bay is well lit and clips process offline.
+tracking:
+  pose_model: "heavy"        # lite | full | heavy
+  smoothing: "one_euro"      # one_euro | ema | none
+  one_euro:
+    min_cutoff: 1.2          # lower = smoother when still (kills jitter)
+    beta: 0.02               # higher = snappier through fast downswing
+    d_cutoff: 1.0
+  smoothing_alpha: 0.35      # only used when smoothing: ema
+  min_torso_visibility: 0.6
+  detection_confidence: 0.6
+  presence_confidence: 0.6
+  tracking_confidence: 0.6
 
 annotation:
   slow_motion_factor: 0.5
@@ -65,6 +83,10 @@ llm:
   endpoint: "http://localhost:11434/api/generate"
   model: "trinity"
   timeout_seconds: 60
+  # Raise this if the coaching response still feels short. The full text is
+  # published as MQTT attributes, so it is NOT limited by Home Assistant's
+  # 255-character sensor-state cap (the dashboard cards read the full text).
+  max_tokens: 900
   # Ollama vision models accept sampled video frames in the "images" field.
   # Use a vision-capable local model if you want the coach to compare raw
   # motion against the annotated marker overlay.
@@ -103,3 +125,23 @@ archive:
       public_url_prefix: "/local/golf_replays"
     # Browsable in HA Media Browser; also reachable via Nabu Casa.
     - path: '\\homeassistant\media\golf_replays'
+
+# Optional second camera mounted directly above the hitting area. Drop the
+# top-down replay clips into raw_video_dir (any capture method works - a 2nd
+# OBS instance with its own replay buffer, an ffmpeg recorder, etc.) and they
+# will be matched to the same shot by timestamp and analyzed for ball + impact
+# location. Leave disabled until the camera is mounted and the hitting zone is
+# tuned; it never affects the down-the-line analysis.
+top_down:
+  enabled: false
+  raw_video_dir: "C:/golf_swings/top_down"
+  public_base_url: ""        # e.g. http://CHANGE-ME:8765 (defaults to server.public_base_url)
+  angle: "top_down"
+  impact:
+    search_window_s: 0.6
+    ball_min_radius_px: 6
+    ball_max_radius_px: 40
+    hitting_zone_x_pct: 0.5      # where the ball sits in the frame (0..1)
+    hitting_zone_y_pct: 0.5
+    hitting_zone_radius_pct: 0.35
+    calibrated: false           # set true after calibrating a real-world reference

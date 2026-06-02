@@ -26,9 +26,12 @@ SYSTEM_PROMPT = (
     "Coach an amateur golfer using a home simulator. Be honest, constructive, and "
     "actionable. Prioritize contact, consistency, balance, distance, and ball flight. "
     "Do not over-diagnose from one swing: separate what is confirmed, what is likely, "
-    "and what is uncertain. Use NOVA launch data and pose scores as supporting evidence, "
-    "but do not invent measurements. If pose markers jump or the camera angle/lighting "
-    "limits the view, say so and do not treat overlays as perfect truth. "
+    "and what is uncertain. Treat NOVA launch monitor numbers as the primary evidence "
+    "for ball flight, contact, face/path, spin, distance, and consistency. Use pose scores "
+    "and overlay-derived body metrics only as secondary support. Do not choose a main issue "
+    "from pose data unless it is also visible in the raw swing or supported by the launch "
+    "numbers. Do not invent measurements. If pose markers jump or the camera angle/lighting "
+    "limits the view, say so and do not treat overlays as truth. "
     "Prioritize the top 2 or 3 issues only, explain in plain English, and give simple "
     "home/simulator drills with what the golfer should feel. Reply with strict JSON only, "
     "matching the requested schema."
@@ -50,7 +53,7 @@ def _first_value(data: Dict[str, Any], *keys: str) -> Any:
     return ""
 
 
-def _dashboard_text(value: Any, limit: int = 240) -> str:
+def _dashboard_text(value: Any, limit: int = 2000) -> str:
     if isinstance(value, list):
         text = " | ".join(str(item) for item in value if item)
     elif isinstance(value, dict):
@@ -163,9 +166,11 @@ def _compact_metrics(analysis: Dict[str, Any]) -> Dict[str, Any]:
     }
     return {
         "launch_monitor": {k: _rounded(shot.get(k)) for k in shot_keys if k in shot},
-        "body": _rounded(analysis.get("body", {})),
-        "advanced_summary": _rounded({k: v for k, v in advanced_summary.items() if v}),
-        "scores": _rounded(analysis.get("scores", {})),
+        "pose_supporting_context": {
+            "body": _rounded(analysis.get("body", {})),
+            "advanced_summary": _rounded({k: v for k, v in advanced_summary.items() if v}),
+            "scores": _rounded(analysis.get("scores", {})),
+        },
         "score_summary": analysis.get("score_summary"),
         "faults": analysis.get("faults", []),
         "body_summary": analysis.get("body_summary"),
@@ -263,26 +268,36 @@ def generate_summary(cfg: Dict[str, Any], analysis: Dict[str, Any]) -> Optional[
         f"Club: {analysis.get('club')}\n"
         f"Camera angle: {analysis.get('camera_angle')}\n"
         f"Swing data: {json.dumps(compact_metrics)}\n\n"
+        "Evidence priority:\n"
+        "1. Use launch_monitor numbers first: carry/total, offline, launch angle, ball speed, "
+        "club speed, smash, spin, spin axis, shot shape, peak height, and descent angle.\n"
+        "2. Use raw visual frames second when available.\n"
+        "3. Use pose_supporting_context last. Pose tracking and overlays can be shaky, especially "
+        "legs/hips, so treat them as hints rather than proof.\n"
+        "If launch numbers and pose hints disagree, trust the launch numbers and say the pose "
+        "data is uncertain.\n\n"
         f"Visual frames attached: {len(images)}. When images are attached, they are sampled "
         "from the raw swing video and the annotated/marker video. Use the raw golfer motion "
         "as primary evidence; marker overlays may be approximate or temporarily inaccurate. "
         "Review the sequence across as many attached frames as needed before deciding the priority issue.\n"
         "Treat hip depth and balance as camera-specific trend metrics, not true 3D measurements.\n"
         "\nAnalyze, when visible, setup, takeaway, backswing, transition, downswing, impact, "
-        "follow-through, tempo/balance, and the launch monitor numbers. Do not list every "
-        "possible flaw. Pick the top 2 or 3 items that most affect the next swing.\n"
-        "\nKeep each JSON value concise enough for Home Assistant sensor display. Use this "
-        "mapping so the dashboard still renders correctly:\n"
+        "follow-through, tempo/balance, and especially the launch monitor numbers. Do not list every "
+        "possible flaw. Pick the top 2 or 3 items that most affect the next swing, favoring "
+        "issues that explain the measured ball flight.\n"
+        "\nWrite the full coaching breakdown - do not abbreviate or cut yourself off. Use this "
+        "mapping for each field:\n"
         "- priority_fault: Overall Grade plus the single most important fix.\n"
         "- why_it_matters: 3-5 sentence quick summary in plain English.\n"
-        "- evidence: one short string covering what looks good, confirmed issues, likely issues, "
+        "- evidence: cover what looks good, confirmed issues, likely issues, "
         "launch-monitor interpretation, and data/camera quality notes.\n"
         "- drill: 2-3 drills; for each include what it fixes, how to do it, what to feel, and reps.\n"
         "- confidence: low|medium|high plus one short reason and a 3-item next swing checklist.\n"
         "Do not use alternate keys like priority, observations, drills, or summary. The required "
         "keys are exactly priority_fault, why_it_matters, evidence, drill, and confidence.\n"
-        "Keep every value under 220 characters. Do not return arrays. Do not repeat phrases, "
-        "do not emit placeholders, and do not put schema/field names inside the values.\n"
+        "Each value must be a single complete string (not an array). Be as thorough as needed, "
+        "but do not repeat phrases, do not emit placeholders, and do not put schema/field names "
+        "inside the values.\n"
         "\nReply with JSON only:\n"
         "{\n"
         '  "priority_fault": "Overall Grade: ... | Most Important Fix: ...",\n'
@@ -301,7 +316,7 @@ def generate_summary(cfg: Dict[str, Any], analysis: Dict[str, Any]) -> Optional[
         "format": "json",
         "options": {
             "temperature": float(cfg.get("temperature", 0.2)),
-            "num_predict": int(cfg.get("max_tokens", 350)),
+            "num_predict": int(cfg.get("max_tokens", 900)),
         },
     }
     if images:
