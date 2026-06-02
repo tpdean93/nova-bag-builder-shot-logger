@@ -48,6 +48,15 @@ const novaTrackEditing = (host) => {
   });
   host.addEventListener('focusout', () => { host._editing = false; });
 };
+/** Brief visible "pressed" flash so clicks feel responsive on desktop + TV. */
+const novaPulse = (el) => {
+  if (!el) return;
+  el.classList.remove('nova-pulse');
+  // Force reflow so the animation restarts on rapid repeat clicks.
+  void el.offsetWidth;
+  el.classList.add('nova-pulse');
+  window.setTimeout(() => el.classList.remove('nova-pulse'), 320);
+};
 
 // Lean-back / TV layout: touch remotes and 16:9-ish screens (excludes 21:9 ultrawide).
 const NOVA_TV_MEDIA = '@media (hover:none) and (pointer:coarse),(min-width:1200px) and (max-aspect-ratio:18/10) and (min-height:650px)';
@@ -436,7 +445,30 @@ class GolfShotHistoryCard extends HTMLElement {
 
 class GolfSessionControlCard extends HTMLElement {
   setConfig(config) { this.config = config || {}; }
-  set hass(hass) { this._hass = hass; this.render(); }
+  set hass(hass) {
+    this._hass = hass;
+    const sig = this.renderSignature(hass);
+    if (sig === this._signature && this._rendered) return;
+    this._signature = sig;
+    this._rendered = true;
+    this.render();
+  }
+  renderSignature(hass) {
+    const ids = [
+      this.config.workflow_entity || 'sensor.golf_range_matrix_range_matrix_workflow',
+      this.config.player_entity || 'select.golf_range_matrix_range_matrix_active_player',
+      this.config.club_entity || 'select.golf_range_matrix_range_matrix_active_club',
+      this.config.shots_per_club_entity || 'number.golf_range_matrix_range_matrix_shots_per_club',
+      'switch.golf_range_matrix_range_matrix_recording',
+      'sensor.golf_sim_control_status', 'sensor.golf_sim_control_sim_control_status',
+      'sensor.golf_sim_control_obs_scene', 'sensor.golf_sim_control_sim_control_obs_scene',
+      'sensor.golf_sim_control_scene_matches', 'sensor.golf_sim_control_sim_control_scene_matches',
+    ];
+    return ids.map((id) => {
+      const st = hass.states?.[id];
+      return `${id}:${st?.state ?? ''}:${JSON.stringify(st?.attributes ?? {})}`;
+    }).join('|');
+  }
   state(entity) { return novaState(this._hass, entity); }
   select(entity, option) { this._hass.callService('select', 'select_option', { entity_id: entity, option }); }
   setShots(entity, value) { this._hass.callService('number', 'set_value', { entity_id: entity, value }); }
@@ -491,27 +523,36 @@ class GolfSessionControlCard extends HTMLElement {
         <div class="simstatus ${sceneMatches ? 'ok' : ''}"><span></span>${simOnline ? `OBS: ${novaEsc(obsScene || 'unknown')}` : 'SIM agent offline'}</div>
         <div class="simactions">
           ${simButtons.map(([entities, label, icon]) => {
-            const entity = Array.isArray(entities) ? this.firstEntity(entities) : entities;
-            const entityState = entity ? novaState(this._hass, entity) : null;
-            const entityMissing = !entity || !entityState || entityState.state === 'unavailable';
-            const disabled = entityMissing || !simOnline;
-            return `<button class="action sim ${disabled ? 'disabled' : ''}" data-button="${novaEsc(entity)}" ${disabled ? 'disabled' : ''}><ha-icon icon="${novaEsc(icon)}"></ha-icon>${novaEsc(label)}</button>`;
+            const candidates = Array.isArray(entities) ? entities : [entities];
+            const entity = this.firstEntity(candidates);
+            // Only disable when the whole SIM agent is offline. Individual
+            // button entities can briefly read unknown/unavailable (e.g. right
+            // after an HA restart) yet still press fine, so don't grey them
+            // out for that - it just makes the controls feel broken.
+            const disabled = !simOnline;
+            return `<button class="action sim ${disabled ? 'disabled' : ''}" data-button="${novaEsc(entity)}" data-button-candidates="${novaEsc(candidates.join(','))}" ${disabled ? 'disabled' : ''}><ha-icon icon="${novaEsc(icon)}"></ha-icon>${novaEsc(label)}</button>`;
           }).join('')}
         </div>
       </div>
       <div class="stepper"><button data-step="-1">-</button><span>${target} shots per club</span><button data-step="1">+</button></div>
     </div></ha-card><style>
-      ha-card{border:0;border-radius:26px;background:linear-gradient(145deg,rgba(18,25,45,.94),rgba(8,12,24,.86));color:white;overflow:hidden;box-shadow:0 22px 60px rgba(0,0,0,.34)}.panel{padding:18px;position:relative;isolation:isolate}.panel:before{content:'';position:absolute;inset:-30% auto auto 30%;width:360px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(56,248,255,.22),transparent 64%);z-index:-1}.head{display:flex;align-items:center;justify-content:space-between;gap:12px}.kicker,.sectionLabel{color:#8ffcff;font-size:10px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}.title{font-size:24px;font-weight:950;letter-spacing:-.05em}.live{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:999px;background:rgba(255,255,255,.08);font-weight:900;color:rgba(255,255,255,.7)}.live span{width:9px;height:9px;border-radius:50%;background:#ff5d7a;box-shadow:0 0 12px #ff5d7a}.live.on span,.simstatus.ok span{background:#72ff7d;box-shadow:0 0 12px #72ff7d}.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0}.stat{display:grid;grid-template-columns:30px minmax(0,1fr);gap:9px;align-items:center;padding:12px;border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.11)}.stat ha-icon{color:#8ffcff}.stat span{display:block;color:rgba(255,255,255,.55);font-size:10px;text-transform:uppercase;letter-spacing:.1em;font-weight:900}.stat b{display:block;margin-top:4px;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 14px}.chip,.action,.stepper button{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);color:white;border-radius:999px;font-weight:900}.chip{padding:8px 11px}.chip.on{background:rgba(247,255,92,.16);border-color:rgba(247,255,92,.42);color:#f7ff8a}.actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-top:12px}.action{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 8px;border-radius:18px}.action ha-icon{color:#8ffcff}.action.primary{background:rgba(56,248,255,.12);border-color:rgba(56,248,255,.35)}.action.danger ha-icon{color:#ff8aa1}.simbar{display:grid;grid-template-columns:1fr 2fr;gap:10px;align-items:stretch;margin-top:8px}.simstatus{display:flex;align-items:center;gap:9px;padding:12px;border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.11);color:rgba(255,255,255,.76);font-weight:900;min-width:0}.simstatus span{width:9px;height:9px;border-radius:50%;background:#ff5d7a;box-shadow:0 0 12px #ff5d7a;flex:0 0 auto}.simactions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.action.sim{padding:10px 8px;background:rgba(56,248,255,.09);border-color:rgba(56,248,255,.25)}.action.disabled{opacity:.45;cursor:not-allowed}.stepper{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;padding:10px 12px;border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.11);font-weight:900}.stepper button{width:34px;height:30px;color:#f7ff8a}@media(max-width:760px){.stats{grid-template-columns:1fr}.actions,.simactions{grid-template-columns:repeat(2,minmax(0,1fr))}.simbar{grid-template-columns:1fr}}
+      ha-card{border:0;border-radius:26px;background:linear-gradient(145deg,rgba(18,25,45,.94),rgba(8,12,24,.86));color:white;overflow:hidden;box-shadow:0 22px 60px rgba(0,0,0,.34)}.panel{padding:18px;position:relative;isolation:isolate}.panel:before{content:'';position:absolute;inset:-30% auto auto 30%;width:360px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(56,248,255,.22),transparent 64%);z-index:-1}.head{display:flex;align-items:center;justify-content:space-between;gap:12px}.kicker,.sectionLabel{color:#8ffcff;font-size:10px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}.title{font-size:24px;font-weight:950;letter-spacing:-.05em}.live{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:999px;background:rgba(255,255,255,.08);font-weight:900;color:rgba(255,255,255,.7)}.live span{width:9px;height:9px;border-radius:50%;background:#ff5d7a;box-shadow:0 0 12px #ff5d7a}.live.on span,.simstatus.ok span{background:#72ff7d;box-shadow:0 0 12px #72ff7d}.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0}.stat{display:grid;grid-template-columns:30px minmax(0,1fr);gap:9px;align-items:center;padding:12px;border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.11)}.stat ha-icon{color:#8ffcff}.stat span{display:block;color:rgba(255,255,255,.55);font-size:10px;text-transform:uppercase;letter-spacing:.1em;font-weight:900}.stat b{display:block;margin-top:4px;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 14px}.chip,.action,.stepper button{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);color:white;border-radius:999px;font-weight:900;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .07s ease,background .12s ease,box-shadow .12s ease,border-color .12s ease}.chip:hover,.action:hover,.stepper button:hover{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.28)}.chip:active,.action:active,.stepper button:active{transform:scale(.95)}.chip{padding:8px 11px}.chip.on{background:rgba(247,255,92,.16);border-color:rgba(247,255,92,.42);color:#f7ff8a}.actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-top:12px}.action{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 8px;border-radius:18px}.action ha-icon{color:#8ffcff}.action.primary{background:rgba(56,248,255,.12);border-color:rgba(56,248,255,.35)}.action.danger ha-icon{color:#ff8aa1}.simbar{display:grid;grid-template-columns:1fr 2fr;gap:10px;align-items:stretch;margin-top:8px}.simstatus{display:flex;align-items:center;gap:9px;padding:12px;border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.11);color:rgba(255,255,255,.76);font-weight:900;min-width:0}.simstatus span{width:9px;height:9px;border-radius:50%;background:#ff5d7a;box-shadow:0 0 12px #ff5d7a;flex:0 0 auto}.simactions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.action.sim{padding:10px 8px;background:rgba(56,248,255,.09);border-color:rgba(56,248,255,.25)}.action.disabled{opacity:.45;cursor:not-allowed}.action.disabled:hover{background:rgba(56,248,255,.09);border-color:rgba(56,248,255,.25);transform:none}.nova-pulse{animation:novaPress .32s ease}@keyframes novaPress{0%{transform:scale(.93);box-shadow:0 0 0 0 rgba(56,248,255,.55),inset 0 0 0 2px rgba(56,248,255,.6)}60%{box-shadow:0 0 0 8px rgba(56,248,255,0),inset 0 0 0 2px rgba(56,248,255,.35)}100%{transform:scale(1);box-shadow:0 0 0 0 rgba(56,248,255,0)}}.stepper{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;padding:10px 12px;border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.11);font-weight:900}.stepper button{width:34px;height:30px;color:#f7ff8a}@media(max-width:760px){.stats{grid-template-columns:1fr}.actions,.simactions{grid-template-columns:repeat(2,minmax(0,1fr))}.simbar{grid-template-columns:1fr}}
       ${novaTvStyles}
     </style>`;
-    this.querySelectorAll('[data-player]').forEach(b => b.addEventListener('click', () => this.select(playerEntity, b.dataset.player)));
-    this.querySelectorAll('[data-club]').forEach(b => b.addEventListener('click', () => this.select(clubEntity, b.dataset.club)));
-    this.querySelector('[data-action="map"]')?.addEventListener('click', () => novaCall(this._hass, 'start_mapping'));
-    this.querySelector('[data-action="bag"]')?.addEventListener('click', () => novaCall(this._hass, 'start_bag_test'));
-    this.querySelector('[data-action="discard"]')?.addEventListener('click', () => novaCall(this._hass, 'discard_last_shot'));
-    this.querySelector('[data-action="stop"]')?.addEventListener('click', () => novaCall(this._hass, 'stop_session'));
-    this.querySelectorAll('[data-button]').forEach(b => b.addEventListener('click', () => this.pressButton(b.dataset.button)));
-    this.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => this.setShots(shotsEntity, Math.max(1, Math.min(20, target + Number(b.dataset.step))))));
+    this.querySelectorAll('[data-player]').forEach(b => b.addEventListener('click', () => { novaPulse(b); this.select(playerEntity, b.dataset.player); }));
+    this.querySelectorAll('[data-club]').forEach(b => b.addEventListener('click', () => { novaPulse(b); this.select(clubEntity, b.dataset.club); }));
+    this.querySelector('[data-action="map"]')?.addEventListener('click', (ev) => { novaPulse(ev.currentTarget); novaCall(this._hass, 'start_mapping'); });
+    this.querySelector('[data-action="bag"]')?.addEventListener('click', (ev) => { novaPulse(ev.currentTarget); novaCall(this._hass, 'start_bag_test'); });
+    this.querySelector('[data-action="discard"]')?.addEventListener('click', (ev) => { novaPulse(ev.currentTarget); novaCall(this._hass, 'discard_last_shot'); });
+    this.querySelector('[data-action="stop"]')?.addEventListener('click', (ev) => { novaPulse(ev.currentTarget); novaCall(this._hass, 'stop_session'); });
+    this.querySelectorAll('[data-button]').forEach(b => b.addEventListener('click', () => {
+      if (b.disabled) return;
+      novaPulse(b);
+      const candidates = (b.dataset.buttonCandidates || b.dataset.button || '').split(',').filter(Boolean);
+      const entity = this.firstEntity(candidates) || b.dataset.button;
+      this.pressButton(entity);
+    }));
+    this.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => { novaPulse(b); this.setShots(shotsEntity, Math.max(1, Math.min(20, target + Number(b.dataset.step)))); }));
   }
 }
 
