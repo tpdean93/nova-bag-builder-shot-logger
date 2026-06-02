@@ -106,8 +106,8 @@ ${NOVA_TV_MEDIA}{
   .simactions{grid-template-columns:repeat(2,minmax(0,1fr))!important}
   .chip,.toggle,.mtool,.save,.pill{min-height:48px;font-size:15px}
   .toggle ha-icon,.mtool ha-icon,.action ha-icon{--mdc-icon-size:24px}
-  .grid{grid-template-columns:1fr!important}
-  .club{font-size:clamp(30px,3.5vw,40px)!important}
+  .grid{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))!important}
+  .club{font-size:clamp(24px,2.4vw,34px)!important}
   .numbers b,.details b{font-size:clamp(22px,2.8vw,28px)!important}
   .numbers span,.details span{font-size:12px!important}
   .video{min-height:0!important;max-height:min(56vh,640px)}
@@ -755,9 +755,17 @@ class NovaWedgeMatrixCard extends HTMLElement {
       this._draftPlayer = this.player();
       this._draft = JSON.parse(JSON.stringify(server));
       this._matrixServerKey = serverKey;
-    } else if (!this.dirty() && this._matrixServerKey !== serverKey) {
-      this._draft = JSON.parse(JSON.stringify(server));
-      this._matrixServerKey = serverKey;
+    } else {
+      // "User edited" = the draft diverged from the server snapshot we last
+      // synced from. Compare against that snapshot directly (NOT dirty(),
+      // which calls matrix() and would recurse infinitely). If the user has
+      // no local edits and the server changed, adopt the fresh server data.
+      const draftKey = JSON.stringify(this._draft);
+      const userEdited = draftKey !== (this._matrixServerKey ?? draftKey);
+      if (!userEdited && this._matrixServerKey !== serverKey) {
+        this._draft = JSON.parse(JSON.stringify(server));
+        this._matrixServerKey = serverKey;
+      }
     }
     return this._draft;
   }
