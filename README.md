@@ -36,6 +36,8 @@ The integration stores app data in `golf_range_matrix.sqlite3` under the Home As
 
 - **Wedge target trainer**: toggle a target green at a settable distance and landing radius (with quick preset buttons for 50/75/100/125/150/175 yd). The card draws the green and pin, shows a live **HIT / MISS** badge for the current shot, and keeps a running hits/attempts tally with a landing percentage. Settings and the score persist in the browser, and there's a Reset.
 - **Quick club select**: a compact strip of the clubs in the active bag (driven by `select.golf_range_matrix_range_matrix_active_club`). Tap a club to set which club the next logged shot used; the active club is highlighted and the last-shot time is shown.
+- **Fairway width**: set the fairway width in yards (15–90, default 40). The fairway is drawn to scale and each shot is graded **Fairway / Miss Left / Miss Right** by comparing its offline distance to half the fairway width.
+- **Projector mode**: a fullscreen button on the range (and a Projector button in the control bar) blows the range view up to fill a screen/projector so you can see the aim line and target green while you hit. Press Esc to exit; the card re-syncs to the latest shot on exit.
 - **Responsive**: scales cleanly from an ultrawide monitor to a TV/kiosk.
 
 ## Local Swing Analyzer
