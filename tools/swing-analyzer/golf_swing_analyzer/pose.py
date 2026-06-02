@@ -249,8 +249,8 @@ def _smooth_frames_one_euro(
       - beta: higher = follows fast motion harder (less lag at impact).
       - d_cutoff: derivative cutoff, rarely needs changing.
     """
-    min_cutoff = float(params.get("min_cutoff", 1.2))
-    beta = float(params.get("beta", 0.02))
+    min_cutoff = float(params.get("min_cutoff", 1.5))
+    beta = float(params.get("beta", 4.0))
     d_cutoff = float(params.get("d_cutoff", 1.0))
 
     filters: Dict[str, Tuple[_OneEuroFilter, _OneEuroFilter, _OneEuroFilter]] = {}

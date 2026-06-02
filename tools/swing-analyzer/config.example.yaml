@@ -27,8 +27,8 @@ tracking:
   pose_model: "heavy"        # lite | full | heavy
   smoothing: "one_euro"      # one_euro | ema | none
   one_euro:
-    min_cutoff: 1.2          # lower = smoother when still (kills jitter)
-    beta: 0.02               # higher = snappier through fast downswing
+    min_cutoff: 1.5          # lower = smoother when still (kills jitter)
+    beta: 4.0                # higher = snappier through fast downswing (less overlay lag)
     d_cutoff: 1.0
   smoothing_alpha: 0.35      # only used when smoothing: ema
   min_torso_visibility: 0.6

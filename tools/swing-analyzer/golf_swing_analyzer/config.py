@@ -34,8 +34,11 @@ DEFAULTS: Dict[str, Any] = {
         # Jitter filter: "one_euro" (recommended) | "ema" | "none".
         "smoothing": "one_euro",
         "one_euro": {
-            "min_cutoff": 1.2,
-            "beta": 0.02,
+            # Coords are normalized 0..1, so beta must be large for the cutoff
+            # to actually rise during the fast downswing (otherwise the overlay
+            # lags behind the body). min_cutoff controls smoothness when still.
+            "min_cutoff": 1.5,
+            "beta": 4.0,
             "d_cutoff": 1.0,
         },
         # Legacy exponential-average strength (only used when smoothing: ema).
