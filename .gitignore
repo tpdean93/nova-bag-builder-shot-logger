@@ -7,3 +7,8 @@ data/
 *.sqlite3
 *.db
 .DS_Store
+
+# Local analyzer config holds secrets (OBS/MQTT passwords) - never commit it.
+config.yaml
+# Stray top-level analyzer copy; the canonical service lives in tools/swing-analyzer.
+/golf_swing_analyzer/
