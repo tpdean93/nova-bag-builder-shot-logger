@@ -29,8 +29,24 @@ const novaSortClubs = (clubs) => [...(clubs || [])].sort((a, b) => {
 /** True when the user is typing in an input inside this card (skip full re-render). */
 const novaIsEditing = (root) => {
   if (!root) return false;
+  if (root._editing) return true;
   const active = root.getRootNode()?.activeElement;
   return !!(active && root.contains(active) && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA'));
+};
+/**
+ * Track focus on a card host so we never re-render (and blow away an input)
+ * while the user is typing. focusin/focusout bubble and survive innerHTML
+ * rebuilds, unlike the activeElement check which is unreliable across HA's
+ * nested shadow DOM. Only INPUT/TEXTAREA focus counts as "editing" so that
+ * clicking a button (Set/Save/Add) still allows the follow-up re-render.
+ */
+const novaTrackEditing = (host) => {
+  if (host._editingTracked) return;
+  host._editingTracked = true;
+  host.addEventListener('focusin', (ev) => {
+    host._editing = ['INPUT', 'TEXTAREA'].includes(ev.target?.tagName);
+  });
+  host.addEventListener('focusout', () => { host._editing = false; });
 };
 
 // Lean-back / TV layout: touch remotes and 16:9-ish screens (excludes 21:9 ultrawide).
@@ -507,8 +523,10 @@ class NovaBagBuilderCard extends HTMLElement {
     this._draft = null;
     this._draftPlayer = null;
   }
+  connectedCallback() { novaTrackEditing(this); }
   set hass(hass) {
     this._hass = hass;
+    novaTrackEditing(this);
     const sig = this.renderSignature(hass);
     if (novaIsEditing(this)) return;
     if (sig === this._signature && this._rendered) return;
@@ -643,8 +661,10 @@ class NovaWedgeMatrixCard extends HTMLElement {
     this._selected = null;
     this._capture = null;
   }
+  connectedCallback() { novaTrackEditing(this); }
   set hass(hass) {
     this._hass = hass;
+    novaTrackEditing(this);
     this.captureShotIfNeeded(hass);
     const sig = this.renderSignature(hass);
     if (novaIsEditing(this)) return;
@@ -783,7 +803,6 @@ class NovaWedgeMatrixCard extends HTMLElement {
     if (yardInput) {
       yardInput.value = yardValue;
       yardInput.addEventListener('input', (ev) => { this._yardDraft = ev.target.value; });
-      yardInput.addEventListener('blur', () => { this._yardDraft = undefined; });
       yardInput.addEventListener('keydown', (ev) => {
         if (ev.key === 'Enter') this.updateSelected(ev.currentTarget.value);
       });
@@ -800,8 +819,10 @@ class NovaWedgeMatrixCard extends HTMLElement {
 
 class GolfClubResultsCard extends HTMLElement {
   setConfig(config) { this.config = config || {}; }
+  connectedCallback() { novaTrackEditing(this); }
   set hass(hass) {
     this._hass = hass;
+    novaTrackEditing(this);
     const playerEntity = this.config.player_entity || 'select.golf_range_matrix_range_matrix_active_player';
     const summaryEntity = this.config.summary_entity || 'sensor.golf_range_matrix_range_matrix_player_bag_summary';
     const attrs = novaAttrs(hass, summaryEntity);
